@@ -49,10 +49,6 @@ public:
         printf("transitions in table: %zd\n", state_count);
     }
 
-    template <typename StartState, typename Event, class CompletionToken >
-    auto start(Event evt, CompletionToken token) {
-        //push<StartState>(evt);
-    }
 
 public:
     template <typename State, typename Event>
@@ -68,7 +64,7 @@ public:
          * instantiate next state
          *
          */
-        next_state_t next(m_ctx);
+        //next_state_t next(m_ctx);
         printf("===== state: '%s', event: '%s', next ==> '%12s'\n", typeid(State).name(), typeid(Event).name(), typeid(next_state_t).name());
 
 
@@ -83,13 +79,14 @@ public:
          * Sidemark: IDK if the functor is needed or not.
          */
 
-        /*result_type completion_handler =*/ next(event, [next,this](){
+        /*result_type completion_handler = next(event, [next,this](){
             // we'd also need to store the completion_handler somewhere, but I can actually not
             // remember the actual asio semantics
         });
+        */
 
 
-        return next;
+        return 0;
     }
 
     Context m_ctx;

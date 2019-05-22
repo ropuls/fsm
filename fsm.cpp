@@ -59,7 +59,7 @@ struct connecting {
     {}
 
     // event and callback function are being passed in
-    void operator()(success<sock> s, std::function<void()> cb) {
+    void operator()(success<sock> s) {
         m_ctx->log(std::string("connecting: starting the connection...") + std::to_string(s.value));
     }
 
@@ -75,8 +75,7 @@ struct connected {
         m_ctx->log("connected: created");
     }
 
-    template <typename Callable>
-    void operator()(success<sock>, Callable cb) {
+    void operator()(success<sock>) {
         m_ctx->log("connected: sending credentials");
     }
     std::shared_ptr<context> m_ctx;
@@ -89,7 +88,7 @@ struct failed {
         m_ctx(ctx)
     {}
 
-    int operator()(exception e, std::function<void()>) {
+    void operator()(exception e) {
         m_ctx->log(std::string("failed: something whent wrong, namely: ") + e.what());
         exit(1);
     }
@@ -100,10 +99,11 @@ struct failed {
 using transitions = std::variant<
 /*  ---------- | state      | event ------------| followup-state -- */
     transition  <start,       success<sock>,      connecting>,
-    transition  <start,       exception,          failed>,
-
+    transition  <start,       exception,          failed>
+/*
     transition  <connecting,  success<sock>,      connected>,
     transition  <connected,   exception,          failed>
+    */
 >;
 
 //using states = remove_duplicates_t<decltype(extract_states(table))>;
