@@ -80,7 +80,9 @@ struct connected {
     connected(std::shared_ptr<context> ctx) : m_ctx(ctx) {}
 
     template <typename Callable>
-    void operator()(success<sock>, Callable ) {}
+    void operator()(success<sock>, Callable cb) {
+        cb(std::runtime_error("remote disconnect"));
+    }
 
     std::shared_ptr<context> m_ctx;
 };
@@ -95,7 +97,7 @@ struct failed {
         m_ctx->log(std::string("failed: ") + e.what());
         cb(e);
     }
-    std::shared_ptr<context> m_ctx;
+    SharedContext m_ctx;
 };
 
 
@@ -106,6 +108,7 @@ using transitions = std::variant<
 
     transition  <connecting,  success<sock>,      connected>,
     transition  <connecting,  exception,          failed>,
+
     transition  <connected,   exception,          failed>,
     transition  <failed, std::any, failed>
 

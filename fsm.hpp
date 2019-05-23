@@ -72,7 +72,10 @@ public:
 
         std::visit([&](auto && current_state){
             using current_state_type = std::decay_t<decltype(current_state)>;
-            printf("current state is: %s\n", type_name<current_state_type>().c_str());
+            printf("*** current state is: %s, event is: %s ***\n",
+                   type_name<current_state_type>().c_str(),
+                   type_name<Event>().c_str()
+                   );
 
             if constexpr(std::variant_size_v<TransitionTable> > match<TransitionTable, current_state_type, Event>()) {
                 //using transition_state_type = std::variant_alternative_t<match<TransitionTable, current_state_type, Event>(), TransitionTable>;
@@ -83,10 +86,8 @@ public:
                 printf("transition.size() = %zd, next_state = %zd\n", std::variant_size_v<TransitionTable>, match<TransitionTable, current_state_type, Event>());
             }
 
-            printf("---\n\n");
-            std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        }, m_state);
+        }, m_state.value());
     }
 //protected:
 
@@ -114,11 +115,10 @@ public:
          */
         auto prev = std::exchange(m_state, next_state_t(m_ctx));
 
-        //auto next = next_state_t(m_ctx);
 
-        m_state = next_state_t(m_ctx);
-
-        printf("[%s <<< %s >>> %s]\n", type_name<state_type>().c_str(), type_name<event_type>().c_str(), type_name<next_state_t>().c_str());
+        printf("[%s + %s > %s]\n", type_name<state_type>().c_str(), type_name<event_type>().c_str(), type_name<next_state_t>().c_str());
+        printf("---\n\n");
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 
 
         /*
@@ -132,7 +132,7 @@ public:
          * Sidemark: IDK if the functor is needed or not.
          */
 
-        std::get<next_state_t>(m_state)(evt, *this);
+        std::get<next_state_t>(*m_state)(evt, *this);
 
         /*result_type completion_handler = next(event, [next,this](){
             // we'd also need to store the completion_handler somewhere, but I can actually not
@@ -141,9 +141,9 @@ public:
         */
 
 
-        return std::get<next_state_t>(m_state);
+        //return std::get<next_state_t>(m_state);
     }
 
     Context m_ctx;
-    states m_state;
+    std::optional<states> m_state;
 };
