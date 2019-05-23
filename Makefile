@@ -1,4 +1,4 @@
-CXX = g++-7
+CXX = clang++-7
 CXXFLAGS = -std=c++17 -g -Wall -I. -I./include/ -DASIO_STANDALONE -MD
 LDFLAGS = -pthread
 

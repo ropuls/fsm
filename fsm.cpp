@@ -44,10 +44,16 @@ struct context {
  * state definitions
  */
 
+using SharedContext = std::shared_ptr<context>;
 //
 // start state, does nothing
 //
-struct start {};
+struct start {
+    start(SharedContext ctx) :
+        m_ctx(ctx)
+    {}
+    SharedContext m_ctx;
+};
 
 
 //
@@ -58,6 +64,9 @@ struct connecting {
         m_ctx(ctx)
     {}
 
+    void start(success<sock> ) {
+        printf("starting...\n");
+    }
     // event and callback function are being passed in
     void operator()(success<sock> s) {
         m_ctx->log(std::string("connecting: starting the connection...") + std::to_string(s.value));
@@ -88,6 +97,11 @@ struct failed {
         m_ctx(ctx)
     {}
 
+    template <typename T>
+    void operator()(T) {
+
+    }
+
     void operator()(exception e) {
         m_ctx->log(std::string("failed: something whent wrong, namely: ") + e.what());
         exit(1);
@@ -109,13 +123,15 @@ using transitions = std::variant<
 //using states = remove_duplicates_t<decltype(extract_states(table))>;
 
 
-int main(int, char *argv[]) {
-    state_machine<transitions, std::shared_ptr<context>> fsm;
+int main(int, char **) {
+    SharedContext ctx = std::make_shared<context>();
+    start start_token(ctx);
+    state_machine<transitions, SharedContext> fsm(start_token, ctx);
 
-    start start_token;
     success<sock> sck(0);
 
-    auto next = fsm(start_token, sck);
+    fsm.feed(sck);
+    fsm.process(start_token, sck);
 
     printf("terminated\n");
 }
