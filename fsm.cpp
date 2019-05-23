@@ -49,9 +49,16 @@ using SharedContext = std::shared_ptr<context>;
 // start state, does nothing
 //
 struct start {
-    start(SharedContext ctx) :
+    start(SharedContext ctx, std::string ip, std::string user, std::string pass) :
         m_ctx(ctx)
     {}
+
+    template <typename Callable>
+    void operator()(Callable && cb) {
+        success<int> e(42);
+        cb(e);
+    }
+
     SharedContext m_ctx;
 };
 
@@ -66,7 +73,7 @@ struct connecting {
 
     // event and callback function are being passed in
     template <typename Callable>
-    void operator()(success<sock> s, Callable &cb) {
+    void operator()(success<sock> s, Callable && cb) {
         //m_ctx->log(std::string("connecting: starting the connection...") + std::to_string(s.value));
         cb(s);
     }
@@ -80,7 +87,7 @@ struct connected {
     connected(std::shared_ptr<context> ctx) : m_ctx(ctx) {}
 
     template <typename Callable>
-    void operator()(success<sock>, Callable cb) {
+    void operator()(success<sock>, Callable && cb) {
         cb(std::runtime_error("remote disconnect"));
     }
 
@@ -93,13 +100,19 @@ struct failed {
     failed(std::shared_ptr<context> ctx) : m_ctx(ctx) {}
 
     template <typename Callable>
-    void operator()(exception e, Callable cb) {
+    void operator()(exception e, Callable && cb) {
         m_ctx->log(std::string("failed: ") + e.what());
         cb(e);
     }
     SharedContext m_ctx;
 };
 
+
+/*
+ * obviously, we could introduce other kinds of structs
+ * into the transitions, like explicit start/stop states
+ * any handle std::any as a wildcard event
+ */
 
 using transitions = std::variant<
 /*  ---------- | state      | event ------------| followup-state -- */
@@ -110,7 +123,7 @@ using transitions = std::variant<
     transition  <connecting,  exception,          failed>,
 
     transition  <connected,   exception,          failed>,
-    transition  <failed, std::any, failed>
+    transition  <failed,      std::any,           failed>
 
 >;
 
@@ -119,12 +132,12 @@ using transitions = std::variant<
 
 int main(int, char **) {
     SharedContext ctx = std::make_shared<context>();
-    start start_token(ctx);
-    state_machine<transitions, SharedContext> fsm(start_token, ctx);
+    state_machine<transitions, SharedContext> fsm(ctx);
 
-    success<sock> sck(0);
+    fsm.start<start>("10.0.0.50", "user", "pass");
 
-    fsm(sck);
+    // fsm.start<connecting>(); <- does not work due to operator()() design, good!
+
     //fsm(exception("foo"));
     printf("terminated\n");
 }

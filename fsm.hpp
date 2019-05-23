@@ -56,36 +56,46 @@ public:
     static constexpr size_t state_count = std::variant_size_v<TransitionTable>;
     static_assert(state_count > 1, "no state transitions in table");
 
-    template <typename StartState>
-    state_machine(StartState start, Context c = Context()) :
-        m_ctx(c),
-        m_state(start)
+    state_machine(Context c = Context()) :
+        m_ctx(c)
     {
         printf("transitions in table: %zd\n", state_count);
         printf("unique transitions: %zd\n", std::variant_size_v<states>);
     }
 
+
+
+    using Callback = std::function<void(const std::error_code &ec)>;
+
+    template <typename StartState, typename ... Args>
+    void start(Args && ... args) {
+        m_state = StartState(m_ctx, std::forward<Args>(args)...);
+        std::get<StartState>(*m_state)([this](auto && arg){
+            push(arg);
+        });
+    }
+
+protected:
     template <typename Event>
-    auto operator()(Event evt) {
-
-
+    void push(Event evt) {
 
         std::visit([&](auto && current_state){
             using current_state_type = std::decay_t<decltype(current_state)>;
-            printf("*** current state is: %s, event is: %s ***\n",
-                   type_name<current_state_type>().c_str(),
-                   type_name<Event>().c_str()
-                   );
+//            printf("*** current state is: %s, event is: %s ***\n",
+//                   type_name<current_state_type>().c_str(),
+//                   type_name<Event>().c_str()
+//                   );
 
             if constexpr(std::variant_size_v<TransitionTable> > match<TransitionTable, current_state_type, Event>()) {
                 //using transition_state_type = std::variant_alternative_t<match<TransitionTable, current_state_type, Event>(), TransitionTable>;
                 //using next_state_type       = typename transition_state_type::next_state;
                 process(current_state, evt);
             } else {
-                printf("skipping, no transition for: %s + %s\n", type_name<current_state_type>().c_str(), type_name<Event>().c_str());
-                printf("transition.size() = %zd, next_state = %zd\n", std::variant_size_v<TransitionTable>, match<TransitionTable, current_state_type, Event>());
+                printf("no transition for: %s + %s\n", type_name<current_state_type>().c_str(), type_name<Event>().c_str());
+                if (m_cb) {
+                    m_cb({});
+                }
             }
-
 
         }, m_state.value());
     }
@@ -106,13 +116,8 @@ public:
 
         using transition_state_t    = std::variant_alternative_t<match<TransitionTable, state_type, event_type>(), TransitionTable>; // transition_state_t is now a transition<x,y,z>
         using next_state_t          = typename transition_state_t::next_state;
-        /*
 
-*/
-        /*
-         * instantiate next state
-         *
-         */
+        // instantiate next state, saving previous
         auto prev = std::exchange(m_state, next_state_t(m_ctx));
 
 
@@ -121,29 +126,17 @@ public:
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
 
-        /*
-        using cb_t = std::function<void()>;
-        using result_type = std::invoke_result_t<next_state_t, Event, cb_t>;
-        */
-
-        /*
-         * perform the transition / action
-         *
-         * Sidemark: IDK if the functor is needed or not.
-         */
-
-        std::get<next_state_t>(*m_state)(evt, *this);
-
-        /*result_type completion_handler = next(event, [next,this](){
-            // we'd also need to store the completion_handler somewhere, but I can actually not
-            // remember the actual asio semantics
+         // perform the transition / action
+        std::get<next_state_t>(*m_state)(evt, [&](auto && args) {
+            // this might be a good place to check for termination
+            push(args);
         });
-        */
 
 
-        //return std::get<next_state_t>(m_state);
+        //return std::get<next_state_t>(m_state); <- does not work, since m_state may have been changed mean-while!
     }
 
     Context m_ctx;
     std::optional<states> m_state;
+    Callback m_cb;
 };
