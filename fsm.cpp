@@ -121,7 +121,7 @@ int main(int, char **) {
 
     success<sock> sck(0);
 
-    fsm.feed(sck);
-    fsm.feed(exception("foo"));
+    fsm(sck);
+    //fsm(exception("foo"));
     printf("terminated\n");
 }
