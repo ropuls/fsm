@@ -59,8 +59,8 @@ public:
     state_machine(Context c = Context()) :
         m_ctx(c)
     {
-        printf("transitions in table: %zd\n", state_count);
-        printf("unique transitions: %zd\n", std::variant_size_v<states>);
+//        printf("transitions in table: %zd\n", state_count);
+//        printf("unique transitions: %zd\n", std::variant_size_v<states>);
     }
 
 
@@ -122,7 +122,6 @@ protected:
 
 
         printf("[%s + %s > %s]\n", type_name<state_type>().c_str(), type_name<event_type>().c_str(), type_name<next_state_t>().c_str());
-        printf("---\n\n");
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
 
