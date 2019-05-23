@@ -64,12 +64,11 @@ struct connecting {
         m_ctx(ctx)
     {}
 
-    void start(success<sock> ) {
-        printf("starting...\n");
-    }
     // event and callback function are being passed in
-    void operator()(success<sock> s) {
-        m_ctx->log(std::string("connecting: starting the connection...") + std::to_string(s.value));
+    template <typename Callable>
+    void operator()(success<sock> s, Callable &cb) {
+        //m_ctx->log(std::string("connecting: starting the connection...") + std::to_string(s.value));
+        cb(s);
     }
 
 protected:
@@ -78,33 +77,23 @@ protected:
 
 // connected state: sends some initial data over the socket
 struct connected {
-    connected(std::shared_ptr<context> ctx) :
-        m_ctx(ctx)
-    {
-        m_ctx->log("connected: created");
-    }
+    connected(std::shared_ptr<context> ctx) : m_ctx(ctx) {}
 
-    void operator()(success<sock>) {
-        m_ctx->log("connected: sending credentials");
-    }
+    template <typename Callable>
+    void operator()(success<sock>, Callable ) {}
+
     std::shared_ptr<context> m_ctx;
 };
 
 struct disconnected {};
 
 struct failed {
-    failed(std::shared_ptr<context> ctx) :
-        m_ctx(ctx)
-    {}
+    failed(std::shared_ptr<context> ctx) : m_ctx(ctx) {}
 
-    template <typename T>
-    void operator()(T) {
-
-    }
-
-    void operator()(exception e) {
-        m_ctx->log(std::string("failed: something whent wrong, namely: ") + e.what());
-        exit(1);
+    template <typename Callable>
+    void operator()(exception e, Callable cb) {
+        m_ctx->log(std::string("failed: ") + e.what());
+        cb(e);
     }
     std::shared_ptr<context> m_ctx;
 };
@@ -113,11 +102,13 @@ struct failed {
 using transitions = std::variant<
 /*  ---------- | state      | event ------------| followup-state -- */
     transition  <start,       success<sock>,      connecting>,
-    transition  <start,       exception,          failed>
-/*
+    transition  <start,       exception,          failed>,
+
     transition  <connecting,  success<sock>,      connected>,
-    transition  <connected,   exception,          failed>
-    */
+    transition  <connecting,  exception,          failed>,
+    transition  <connected,   exception,          failed>,
+    transition  <failed, std::any, failed>
+
 >;
 
 //using states = remove_duplicates_t<decltype(extract_states(table))>;
@@ -130,8 +121,7 @@ int main(int, char **) {
 
     success<sock> sck(0);
 
-    fsm.feed(sck);
-    fsm.process(start_token, sck);
-
+    fsm(sck);
+    //fsm(exception("foo"));
     printf("terminated\n");
 }

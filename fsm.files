@@ -510,3 +510,4 @@ include/asio/ip/bad_address_cast.hpp
 include/asio/ip/basic_resolver_query.hpp
 include/asio/ip/resolver_service.hpp
 meta.hpp
+include/type_name.hpp

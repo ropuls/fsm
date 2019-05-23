@@ -4,7 +4,11 @@
 #include <type_traits>
 #include <cstdio>
 #include <functional>
+#include <thread>
+#include <chrono>
+
 #include "meta.hpp"
+#include "type_name.hpp"
 
 /*
  * transition just stores the types used in transitions
@@ -62,24 +66,43 @@ public:
     }
 
     template <typename Event>
-    auto constexpr feed(Event evt) {
+    auto operator()(Event evt) {
 
 
-        //process(m_state, evt);
 
-#if 0
-        std::visit([&](auto && state){
-            printf("doing a visitation on current state: %s\n", typeid(state).name());
-            process(m_state, evt);
+        std::visit([&](auto && current_state){
+            using current_state_type = std::decay_t<decltype(current_state)>;
+            printf("current state is: %s\n", type_name<current_state_type>().c_str());
+
+            if constexpr(std::variant_size_v<TransitionTable> > match<TransitionTable, current_state_type, Event>()) {
+                //using transition_state_type = std::variant_alternative_t<match<TransitionTable, current_state_type, Event>(), TransitionTable>;
+                //using next_state_type       = typename transition_state_type::next_state;
+                process(current_state, evt);
+            } else {
+                printf("skipping, no transition for: %s + %s\n", type_name<current_state_type>().c_str(), type_name<Event>().c_str());
+                printf("transition.size() = %zd, next_state = %zd\n", std::variant_size_v<TransitionTable>, match<TransitionTable, current_state_type, Event>());
+            }
+
+            printf("---\n\n");
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+
         }, m_state);
-#endif
-
     }
 //protected:
+
+
+
     template <typename State, typename Event>
-    auto constexpr process(const State & /*current_state*/, Event && evt) {
+    auto constexpr /* __attribute__((deprecated))*/ process(const State & /*current_state*/, Event && evt)  {
+
+
+
         using state_type            = typename std::decay<State>::type;
         using event_type            = typename std::decay<Event>::type;
+
+        static_assert(std::variant_size_v<TransitionTable> > match<TransitionTable, state_type, event_type>(), "no such transition");
+
+
         using transition_state_t    = std::variant_alternative_t<match<TransitionTable, state_type, event_type>(), TransitionTable>; // transition_state_t is now a transition<x,y,z>
         using next_state_t          = typename transition_state_t::next_state;
         /*
@@ -89,12 +112,13 @@ public:
          * instantiate next state
          *
          */
-        auto prev = m_state;
+        auto prev = std::exchange(m_state, next_state_t(m_ctx));
 
-auto next = next_state_t(m_ctx);
+        //auto next = next_state_t(m_ctx);
 
-        //instance = 1;
-        printf("===== state: '%s', event: '%s', next ==> '%12s'\n", typeid(State).name(), typeid(Event).name(), typeid(next_state_t).name());
+        m_state = next_state_t(m_ctx);
+
+        printf("[%s <<< %s >>> %s]\n", type_name<state_type>().c_str(), type_name<event_type>().c_str(), type_name<next_state_t>().c_str());
 
 
         /*
@@ -108,8 +132,7 @@ auto next = next_state_t(m_ctx);
          * Sidemark: IDK if the functor is needed or not.
          */
 
-        next(evt);
-        m_state = (states)next_state_t(m_ctx);
+        std::get<next_state_t>(m_state)(evt, *this);
 
         /*result_type completion_handler = next(event, [next,this](){
             // we'd also need to store the completion_handler somewhere, but I can actually not
@@ -118,7 +141,7 @@ auto next = next_state_t(m_ctx);
         */
 
 
-        return m_state;
+        return std::get<next_state_t>(m_state);
     }
 
     Context m_ctx;
