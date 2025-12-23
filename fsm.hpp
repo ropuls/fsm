@@ -7,6 +7,7 @@
 #include <thread>
 #include <chrono>
 #include <optional>
+#include <string>
 
 #include "meta.hpp"
 #include "type_name.hpp"
@@ -124,6 +125,30 @@ public:
 //        printf("unique transitions: %zd\n", std::variant_size_v<states>);
     }
 
+    // Helper function to sanitize names for Mermaid (replace special chars)
+    static std::string sanitize_for_mermaid(const std::string& str) {
+        std::string result = str;
+        // Replace < with (
+        size_t pos = 0;
+        while ((pos = result.find('<', pos)) != std::string::npos) {
+            result.replace(pos, 1, "(");
+            pos += 1;
+        }
+        // Replace > with )
+        pos = 0;
+        while ((pos = result.find('>', pos)) != std::string::npos) {
+            result.replace(pos, 1, ")");
+            pos += 1;
+        }
+        // Replace :: with _
+        pos = 0;
+        while ((pos = result.find("::", pos)) != std::string::npos) {
+            result.replace(pos, 2, "_");
+            pos += 1;
+        }
+        return result;
+    }
+
     // Generate Mermaid flowchart
     template <std::size_t index = 0>
     static void print_mermaid_transitions() {
@@ -133,10 +158,10 @@ public:
             using event = typename T::event;
             using to = typename T::next_state;
 
-            printf("    %s -->|%s| %s\n",
-                   type_name<from>().c_str(),
-                   type_name<event>().c_str(),
-                   type_name<to>().c_str());
+            printf("    %s -->|\"%s\"| %s\n",
+                   sanitize_for_mermaid(type_name<from>()).c_str(),
+                   sanitize_for_mermaid(type_name<event>()).c_str(),
+                   sanitize_for_mermaid(type_name<to>()).c_str());
 
             print_mermaid_transitions<index + 1>();
         }
@@ -162,7 +187,7 @@ public:
         if constexpr (index < std::variant_size_v<states>) {
             using State = std::variant_alternative_t<index, states>;
             if constexpr (is_terminal_state<State>::value) {
-                printf("    %s --> [*]\n", type_name<State>().c_str());
+                printf("    %s --> [*]\n", sanitize_for_mermaid(type_name<State>()).c_str());
             }
             print_terminal_states_mermaid<index + 1>();
         }
