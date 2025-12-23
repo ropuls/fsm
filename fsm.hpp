@@ -6,6 +6,8 @@
 #include <functional>
 #include <thread>
 #include <chrono>
+#include <optional>
+#include <string>
 
 #include "meta.hpp"
 #include "type_name.hpp"
@@ -45,6 +47,58 @@ template <template <class...> class TT, class ... Ts>
 auto extract_states(TT<Ts...>)
 -> TT<typename Ts::entry_state..., typename Ts::next_state...>;
 
+template <template <class...> class TT, class ... Ts>
+auto extract_events(TT<Ts...>)
+-> TT<typename Ts::event...>;
+
+// Terminal state marker - specialize this for states that don't need transitions
+template <typename T>
+struct is_terminal_state : std::false_type {};
+
+// Compile-time transition completeness checker
+namespace detail {
+    template <typename State, typename Event, typename TransitionTable, std::size_t index = 0>
+    constexpr bool has_transition() {
+        if constexpr (index == std::variant_size_v<TransitionTable>) {
+            return false;
+        } else if constexpr (equals<std::variant_alternative_t<index, TransitionTable>, State, Event>()) {
+            return true;
+        } else {
+            return has_transition<State, Event, TransitionTable, index + 1>();
+        }
+    }
+
+    template <typename State, typename EventList, typename TransitionTable, std::size_t index = 0>
+    constexpr bool check_state_complete() {
+        if constexpr (is_terminal_state<State>::value) {
+            return true; // Terminal states don't need transitions
+        } else if constexpr (index == std::variant_size_v<EventList>) {
+            return true; // All events checked
+        } else {
+            using Event = std::variant_alternative_t<index, EventList>;
+            if constexpr (!has_transition<State, Event, TransitionTable>()) {
+                return false; // Missing transition found
+            } else {
+                return check_state_complete<State, EventList, TransitionTable, index + 1>();
+            }
+        }
+    }
+
+    template <typename StateList, typename EventList, typename TransitionTable, std::size_t index = 0>
+    constexpr bool check_all_transitions() {
+        if constexpr (index == std::variant_size_v<StateList>) {
+            return true;
+        } else {
+            using State = std::variant_alternative_t<index, StateList>;
+            if constexpr (!check_state_complete<State, EventList, TransitionTable>()) {
+                return false;
+            } else {
+                return check_all_transitions<StateList, EventList, TransitionTable, index + 1>();
+            }
+        }
+    }
+}
+
 
 template <typename TransitionTable, typename Context = bool>
 class state_machine {
@@ -53,8 +107,16 @@ public:
     using extracted = decltype(extract_states(std::declval<TransitionTable>()));
     using states = remove_duplicates_t<extracted>;
 
+    using extracted_events = decltype(extract_events(std::declval<TransitionTable>()));
+    using events = remove_duplicates_t<extracted_events>;
+
     static constexpr size_t state_count = std::variant_size_v<TransitionTable>;
     static_assert(state_count > 1, "no state transitions in table");
+
+    // Compile-time check: All non-terminal states must have transitions for all events
+    static_assert(detail::check_all_transitions<states, events, TransitionTable>(),
+                  "ERROR: Incomplete transition table! Some states are missing transitions for certain events. "
+                  "Either add the missing transitions or mark the state as terminal using is_terminal_state<YourState>.");
 
     state_machine(Context c = Context()) :
         m_ctx(c)
@@ -63,7 +125,119 @@ public:
 //        printf("unique transitions: %zd\n", std::variant_size_v<states>);
     }
 
+    // Helper function to sanitize names for Mermaid (replace special chars)
+    static std::string sanitize_for_mermaid(const std::string& str) {
+        std::string result = str;
+        // Replace < with (
+        size_t pos = 0;
+        while ((pos = result.find('<', pos)) != std::string::npos) {
+            result.replace(pos, 1, "(");
+            pos += 1;
+        }
+        // Replace > with )
+        pos = 0;
+        while ((pos = result.find('>', pos)) != std::string::npos) {
+            result.replace(pos, 1, ")");
+            pos += 1;
+        }
+        // Replace :: with _
+        pos = 0;
+        while ((pos = result.find("::", pos)) != std::string::npos) {
+            result.replace(pos, 2, "_");
+            pos += 1;
+        }
+        return result;
+    }
 
+    // Generate Mermaid flowchart
+    template <std::size_t index = 0>
+    static void print_mermaid_transitions() {
+        if constexpr (index < std::variant_size_v<TransitionTable>) {
+            using T = std::variant_alternative_t<index, TransitionTable>;
+            using from = typename T::entry_state;
+            using event = typename T::event;
+            using to = typename T::next_state;
+
+            printf("    %s -->|\"%s\"| %s\n",
+                   sanitize_for_mermaid(type_name<from>()).c_str(),
+                   sanitize_for_mermaid(type_name<event>()).c_str(),
+                   sanitize_for_mermaid(type_name<to>()).c_str());
+
+            print_mermaid_transitions<index + 1>();
+        }
+    }
+
+    static void print_mermaid() {
+        printf("```mermaid\nstateDiagram-v2\n");
+
+        // Mark terminal states
+        printf("    [*] --> start\n");
+        print_mermaid_transitions();
+
+        // Mark terminal states with end markers
+        if constexpr (std::variant_size_v<states> > 0) {
+            print_terminal_states_mermaid<0>();
+        }
+
+        printf("```\n");
+    }
+
+    template <std::size_t index = 0>
+    static void print_terminal_states_mermaid() {
+        if constexpr (index < std::variant_size_v<states>) {
+            using State = std::variant_alternative_t<index, states>;
+            if constexpr (is_terminal_state<State>::value) {
+                printf("    %s --> [*]\n", sanitize_for_mermaid(type_name<State>()).c_str());
+            }
+            print_terminal_states_mermaid<index + 1>();
+        }
+    }
+
+    // Generate Graphviz DOT format
+    template <std::size_t index = 0>
+    static void print_dot_transitions() {
+        if constexpr (index < std::variant_size_v<TransitionTable>) {
+            using T = std::variant_alternative_t<index, TransitionTable>;
+            using from = typename T::entry_state;
+            using event = typename T::event;
+            using to = typename T::next_state;
+
+            printf("    \"%s\" -> \"%s\" [label=\"%s\"];\n",
+                   type_name<from>().c_str(),
+                   type_name<to>().c_str(),
+                   type_name<event>().c_str());
+
+            print_dot_transitions<index + 1>();
+        }
+    }
+
+    static void print_graphviz() {
+        printf("digraph StateMachine {\n");
+        printf("    rankdir=LR;\n");
+        printf("    node [shape=circle];\n");
+        printf("    start [shape=circle, style=filled, fillcolor=lightgreen];\n");
+
+        // Mark terminal states
+        if constexpr (std::variant_size_v<states> > 0) {
+            print_terminal_states_dot<0>();
+        }
+
+        printf("\n");
+        print_dot_transitions();
+        printf("}\n");
+    }
+
+    template <std::size_t index = 0>
+    static void print_terminal_states_dot() {
+        if constexpr (index < std::variant_size_v<states>) {
+            using State = std::variant_alternative_t<index, states>;
+            if constexpr (is_terminal_state<State>::value) {
+                printf("    \"%s\" [shape=doublecircle, style=filled, fillcolor=lightcoral];\n",
+                       type_name<State>().c_str());
+            }
+            print_terminal_states_dot<index + 1>();
+        }
+    }
 
     using Callback = std::function<void(const std::error_code &ec)>;
 

@@ -107,6 +107,11 @@ struct failed {
     SharedContext m_ctx;
 };
 
+// Mark terminal states - these don't need outgoing transitions
+template <> struct is_terminal_state<failed> : std::true_type {};
+template <> struct is_terminal_state<disconnected> : std::true_type {};
+template <> struct is_terminal_state<connected> : std::true_type {};
+
 
 /*
  * obviously, we could introduce other kinds of structs
@@ -122,15 +127,30 @@ using transitions = std::variant<
     transition  <connecting,  success<sock>,      connected>,
     transition  <connecting,  exception,          failed>,
 
-    transition  <connected,   exception,          failed>,
-    transition  <failed,      std::any,           failed>
+    transition  <connected,   exception,          failed>
 
 >;
 
 //using states = remove_duplicates_t<decltype(extract_states(table))>;
 
 
-int main(int, char **) {
+int main(int argc, char **argv) {
+    // Check if user wants to generate flowchart
+    if (argc > 1 && std::string(argv[1]) == "--flowchart") {
+        printf("=== State Machine Flowcharts ===\n\n");
+
+        printf("--- Mermaid Format ---\n");
+        state_machine<transitions, SharedContext>::print_mermaid();
+
+        printf("\n--- Graphviz DOT Format ---\n");
+        state_machine<transitions, SharedContext>::print_graphviz();
+
+        printf("\nTo visualize:\n");
+        printf("- Mermaid: Copy to https://mermaid.live or use in Markdown\n");
+        printf("- Graphviz: Save to file.dot and run: dot -Tpng file.dot -o output.png\n");
+        return 0;
+    }
+
     SharedContext ctx = std::make_shared<context>();
     state_machine<transitions, SharedContext> fsm(ctx);
 
