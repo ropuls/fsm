@@ -1,20 +1,20 @@
 # Template-Based Finite State Machine (FSM)
 
-Eine moderne C++17 Template-Metaprogrammierung-Bibliothek für typsichere Zustandsmaschinen mit Compile-Zeit-Validierung.
+A modern C++17 template metaprogramming library for type-safe state machines with compile-time validation.
 
 ## Features
 
-### ✨ Hauptfunktionen
+### ✨ Key Highlights
 
-- **Typsicherheit**: Alle Zustände und Übergänge werden zur Compile-Zeit geprüft
-- **Vollständigkeitsprüfung**: Fehlende Übergänge werden zur Compile-Zeit erkannt
-- **Terminal States**: Endzustände können explizit markiert werden
-- **Automatische Visualisierung**: Generiert Flowcharts in Mermaid und Graphviz DOT Format
-- **Zero Runtime Overhead**: Maximale Performance durch Template-Metaprogrammierung
+- **Type Safety**: All states and transitions are validated at compile time
+- **Completeness Checking**: Missing transitions are detected at compile time
+- **Terminal States**: End states can be explicitly marked
+- **Automatic Visualization**: Generates flowcharts in Mermaid and Graphviz DOT formats
+- **Zero Runtime Overhead**: Maximum performance through template metaprogramming
 
-## State Machine Visualisierung
+## State Machine Visualization
 
-Das folgende Diagramm zeigt die Beispiel-State-Machine (Netzwerkverbindung):
+The following diagram shows the example state machine (network connection):
 
 ```mermaid
 stateDiagram-v2
@@ -28,32 +28,32 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-**Legende:**
-- 🟢 **start**: Startzustand (grün)
-- 🔴 **failed, connected**: Terminal States (rot, Doppelkreis)
-- ➡️ **Pfeile**: Zustandsübergänge mit Events als Labels
+**Legend:**
+- 🟢 **start**: Initial state (green)
+- 🔴 **failed, connected**: Terminal states (red, double circle)
+- ➡️ **Arrows**: State transitions with events as labels
 
-## Schnellstart
+## Quick Start
 
-### Kompilieren
+### Build
 
 ```bash
 make
 ```
 
-### Ausführen
+### Run
 
 ```bash
-# Normale Ausführung
+# Normal execution
 ./fsm
 
-# Flowchart generieren
+# Generate flowchart
 ./fsm --flowchart
 ```
 
-## Verwendung
+## Usage
 
-### 1. Zustände definieren
+### 1. Define States
 
 ```cpp
 struct start {
@@ -61,13 +61,13 @@ struct start {
 
     template <typename Callable>
     void operator()(Callable && cb) {
-        // Zustandslogik
+        // State logic
         cb(success<int>(42));
     }
 };
 ```
 
-### 2. Transition Table erstellen
+### 2. Create Transition Table
 
 ```cpp
 using transitions = std::variant<
@@ -79,25 +79,25 @@ using transitions = std::variant<
 >;
 ```
 
-### 3. Terminal States markieren
+### 3. Mark Terminal States
 
 ```cpp
 template <> struct is_terminal_state<failed> : std::true_type {};
 template <> struct is_terminal_state<connected> : std::true_type {};
 ```
 
-### 4. State Machine instanziieren
+### 4. Instantiate State Machine
 
 ```cpp
 state_machine<transitions, SharedContext> fsm(ctx);
 fsm.start<start>("10.0.0.50", "user", "pass");
 ```
 
-## Compile-Zeit-Validierung
+## Compile-Time Validation
 
-### Vollständigkeitsprüfung
+### Completeness Checking
 
-Die State Machine prüft zur Compile-Zeit, ob alle nicht-terminalen Zustände für alle Events Übergänge definiert haben:
+The state machine validates at compile time that all non-terminal states have transitions defined for all events:
 
 ```cpp
 static_assert(detail::check_all_transitions<states, events, TransitionTable>(),
@@ -106,7 +106,7 @@ static_assert(detail::check_all_transitions<states, events, TransitionTable>(),
     "as terminal using is_terminal_state<YourState>.");
 ```
 
-**Beispiel-Fehler bei fehlendem Übergang:**
+**Example error when a transition is missing:**
 
 ```
 error: static assertion failed: ERROR: Incomplete transition table!
@@ -114,14 +114,14 @@ Some states are missing transitions for certain events. Either add the
 missing transitions or mark the state as terminal using is_terminal_state<YourState>.
 ```
 
-### Vorteile
+### Benefits
 
-✅ **Compile-Zeit-Sicherheit**: Fehler werden vor der Ausführung erkannt
-✅ **Keine vergessenen Übergänge**: Garantiert vollständige State Machines
-✅ **Klare Fehlermeldungen**: Zeigt genau, was fehlt
-✅ **Terminal States**: Flexibilität für Endzustände
+✅ **Compile-Time Safety**: Errors are caught before execution
+✅ **No Forgotten Transitions**: Guarantees complete state machines
+✅ **Clear Error Messages**: Shows exactly what's missing
+✅ **Terminal States**: Flexibility for end states
 
-## Flowchart-Generierung
+## Flowchart Generation
 
 ### Mermaid Format
 
@@ -129,56 +129,56 @@ missing transitions or mark the state as terminal using is_terminal_state<YourSt
 ./fsm --flowchart
 ```
 
-Ausgabe kann direkt verwendet werden in:
+Output can be used directly in:
 - GitHub/GitLab Markdown
 - https://mermaid.live
 - Confluence, Notion, etc.
 
 ### Graphviz DOT Format
 
-Das Programm generiert auch Graphviz-kompatible DOT-Dateien:
+The program also generates Graphviz-compatible DOT files:
 
 ```bash
 ./fsm --flowchart > flowchart.txt
-# DOT-Teil extrahieren und speichern
+# Extract DOT part and save
 dot -Tpng flowchart.dot -o fsm.png
 ```
 
 **Features:**
-- Start-Zustand: Grün ausgefüllt
-- Terminal States: Doppelkreis, rot ausgefüllt
-- Horizontales Layout für bessere Lesbarkeit
+- Start state: Green filled circle
+- Terminal states: Double circle, red filled
+- Horizontal layout for better readability
 
-## Architektur
+## Architecture
 
-### Kernkomponenten
+### Core Components
 
 ```
-fsm.hpp              - State Machine Template-Klasse
-├── transition<>     - Übergangs-Definition
-├── state_machine<>  - Haupt-FSM-Klasse
-├── is_terminal_state<> - Terminal State Marker
-└── detail::         - Compile-Zeit-Validierung
+fsm.hpp              - State machine template class
+├── transition<>     - Transition definition
+├── state_machine<>  - Main FSM class
+├── is_terminal_state<> - Terminal state marker
+└── detail::         - Compile-time validation
 
-meta.hpp             - Template-Metaprogrammierung Utilities
-└── remove_duplicates_t<> - Type-List Deduplizierung
+meta.hpp             - Template metaprogramming utilities
+└── remove_duplicates_t<> - Type-list deduplication
 
-type_name.hpp        - Type Introspection
-└── type_name<T>()   - Lesbare Typnamen (demangling)
+type_name.hpp        - Type introspection
+└── type_name<T>()   - Human-readable type names (demangling)
 ```
 
-### Template-Metaprogrammierung
+### Template Metaprogramming
 
-Die Bibliothek nutzt moderne C++ Features:
+The library leverages modern C++ features:
 
-- `std::variant` für Typ-sichere Zustandsspeicherung
-- `constexpr` Funktionen für Compile-Zeit-Berechnungen
-- Template Specialization für Terminal States
-- Perfect Forwarding für Event-Callbacks
+- `std::variant` for type-safe state storage
+- `constexpr` functions for compile-time computation
+- Template specialization for terminal states
+- Perfect forwarding for event callbacks
 
-## Beispiel-Output
+## Example Output
 
-### Normale Ausführung
+### Normal Execution
 
 ```
 [start + success<int> > connecting]
@@ -188,7 +188,7 @@ Die Bibliothek nutzt moderne C++ Features:
 terminated
 ```
 
-### Flowchart-Generierung
+### Flowchart Generation
 
 ```
 === State Machine Flowcharts ===
@@ -207,20 +207,20 @@ digraph StateMachine {
 }
 ```
 
-## Anforderungen
+## Requirements
 
-- **Compiler**: g++ 7+ oder clang++ 7+ mit C++17 Support
+- **Compiler**: g++ 7+ or clang++ 7+ with C++17 support
 - **Standard Library**: C++17 STL (`<variant>`, `<optional>`, etc.)
-- **Optional**: Graphviz für PNG/SVG-Generierung
+- **Optional**: Graphviz for PNG/SVG generation
 
-## Build-System
+## Build System
 
 ```makefile
 CXX = g++
 CXXFLAGS = -std=c++17 -g -Wall
 ```
 
-## Erweiterte Verwendung
+## Advanced Usage
 
 ### Custom Context
 
@@ -233,9 +233,9 @@ struct MyContext {
 state_machine<transitions, std::shared_ptr<MyContext>> fsm(ctx);
 ```
 
-### Event-Typen
+### Event Types
 
-Events können beliebige C++ Typen sein:
+Events can be arbitrary C++ types:
 
 ```cpp
 struct LoginEvent { std::string username; };
@@ -247,14 +247,14 @@ transition<LoggedIn,  LogoutEvent, LoggedOut>
 transition<LoggedIn,  ErrorEvent,  Failed>
 ```
 
-## Lizenz
+## License
 
-Dieses Projekt steht zur freien Verfügung.
+This project is free to use.
 
-## Beiträge
+## Contributing
 
-Contributions sind willkommen! Bitte erstellen Sie einen Pull Request.
+Contributions are welcome! Please create a pull request.
 
 ---
 
-**Entwickelt mit moderner C++ Template-Metaprogrammierung** 🚀
+**Built with modern C++ template metaprogramming** 🚀
