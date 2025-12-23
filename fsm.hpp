@@ -124,7 +124,95 @@ public:
 //        printf("unique transitions: %zd\n", std::variant_size_v<states>);
     }
 
+    // Generate Mermaid flowchart
+    template <std::size_t index = 0>
+    static void print_mermaid_transitions() {
+        if constexpr (index < std::variant_size_v<TransitionTable>) {
+            using T = std::variant_alternative_t<index, TransitionTable>;
+            using from = typename T::entry_state;
+            using event = typename T::event;
+            using to = typename T::next_state;
 
+            printf("    %s -->|%s| %s\n",
+                   type_name<from>().c_str(),
+                   type_name<event>().c_str(),
+                   type_name<to>().c_str());
+
+            print_mermaid_transitions<index + 1>();
+        }
+    }
+
+    static void print_mermaid() {
+        printf("```mermaid\nstateDiagram-v2\n");
+
+        // Mark terminal states
+        printf("    [*] --> start\n");
+        print_mermaid_transitions();
+
+        // Mark terminal states with end markers
+        if constexpr (std::variant_size_v<states> > 0) {
+            print_terminal_states_mermaid<0>();
+        }
+
+        printf("```\n");
+    }
+
+    template <std::size_t index = 0>
+    static void print_terminal_states_mermaid() {
+        if constexpr (index < std::variant_size_v<states>) {
+            using State = std::variant_alternative_t<index, states>;
+            if constexpr (is_terminal_state<State>::value) {
+                printf("    %s --> [*]\n", type_name<State>().c_str());
+            }
+            print_terminal_states_mermaid<index + 1>();
+        }
+    }
+
+    // Generate Graphviz DOT format
+    template <std::size_t index = 0>
+    static void print_dot_transitions() {
+        if constexpr (index < std::variant_size_v<TransitionTable>) {
+            using T = std::variant_alternative_t<index, TransitionTable>;
+            using from = typename T::entry_state;
+            using event = typename T::event;
+            using to = typename T::next_state;
+
+            printf("    \"%s\" -> \"%s\" [label=\"%s\"];\n",
+                   type_name<from>().c_str(),
+                   type_name<to>().c_str(),
+                   type_name<event>().c_str());
+
+            print_dot_transitions<index + 1>();
+        }
+    }
+
+    static void print_graphviz() {
+        printf("digraph StateMachine {\n");
+        printf("    rankdir=LR;\n");
+        printf("    node [shape=circle];\n");
+        printf("    start [shape=circle, style=filled, fillcolor=lightgreen];\n");
+
+        // Mark terminal states
+        if constexpr (std::variant_size_v<states> > 0) {
+            print_terminal_states_dot<0>();
+        }
+
+        printf("\n");
+        print_dot_transitions();
+        printf("}\n");
+    }
+
+    template <std::size_t index = 0>
+    static void print_terminal_states_dot() {
+        if constexpr (index < std::variant_size_v<states>) {
+            using State = std::variant_alternative_t<index, states>;
+            if constexpr (is_terminal_state<State>::value) {
+                printf("    \"%s\" [shape=doublecircle, style=filled, fillcolor=lightcoral];\n",
+                       type_name<State>().c_str());
+            }
+            print_terminal_states_dot<index + 1>();
+        }
+    }
 
     using Callback = std::function<void(const std::error_code &ec)>;
 
