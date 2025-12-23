@@ -107,6 +107,11 @@ struct failed {
     SharedContext m_ctx;
 };
 
+// Mark terminal states - these don't need outgoing transitions
+template <> struct is_terminal_state<failed> : std::true_type {};
+template <> struct is_terminal_state<disconnected> : std::true_type {};
+template <> struct is_terminal_state<connected> : std::true_type {};
+
 
 /*
  * obviously, we could introduce other kinds of structs
@@ -122,8 +127,7 @@ using transitions = std::variant<
     transition  <connecting,  success<sock>,      connected>,
     transition  <connecting,  exception,          failed>,
 
-    transition  <connected,   exception,          failed>,
-    transition  <failed,      std::any,           failed>
+    transition  <connected,   exception,          failed>
 
 >;
 
